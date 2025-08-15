@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import * as XLSX from "xlsx";
 import { Upload, Button, Table, message, Row, Col, Select } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
+import { UploadOutlined, FileExcelOutlined } from "@ant-design/icons";
 import "./CompareInf.css";
 
 const CompareInfContent = () => {
@@ -13,41 +13,7 @@ const CompareInfContent = () => {
   const [compareKey2, setCompareKey2] = useState<string>();
   const [diff1, setDiff1] = useState<any[]>([]);
   const [diff2, setDiff2] = useState<any[]>([]);
-
-  // Đọc file excel và trả về {columns, data}
-  // const readExcel = (file: File, setColumns: any, setData: any) => {
-  //   const reader = new FileReader();
-  //   reader.onload = (e: any) => {
-  //     const bstr = e.target.result;
-  //     const wb = XLSX.read(bstr, { type: "binary" });
-  //     const wsname = wb.SheetNames[0];
-  //     const ws = wb.Sheets[wsname];
-  //     const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 });
-  //     if (jsonData.length > 0) {
-  //       const colHeaders = (jsonData[0] as string[]).map((col: string) => ({
-  //         title: col,
-  //         dataIndex: col,
-  //         key: col,
-  //       }));
-  //       const rowData = (jsonData.slice(1) as any[][]).map((row: any[], idx: number) => {
-  //         const rowObj: any = {};
-  //         (jsonData[0] as string[]).forEach((col: string, colIdx: number) => {
-  //           rowObj[col] = row[colIdx];
-  //         });
-  //         rowObj.key = idx;
-  //         return rowObj;
-  //       });
-  //       setColumns(colHeaders);
-  //       setData(rowData);
-  //     } else {
-  //       setColumns([]);
-  //       setData([]);
-  //       message.warning("File không có dữ liệu!");
-  //     }
-  //   };
-  //   reader.readAsBinaryString(file);
-  //   return false;
-  // };
+  const [bothData, setBothData] = useState<any[]>([]);
 
   const readExcel = (file: File, setColumns: any, setData: any) => {
     const reader = new FileReader();
@@ -71,7 +37,6 @@ const CompareInfContent = () => {
             (jsonData[0] as string[]).forEach((col: string, colIdx: number) => {
               let cellValue = row[colIdx];
 
-              // Nếu cột là 'phone', kiểm tra độ dài và thêm số 0 nếu cần
               if (
                 col.toLowerCase() === "phone" &&
                 cellValue != null &&
@@ -82,7 +47,6 @@ const CompareInfContent = () => {
                   cellValue = "0" + phoneStr;
                 }
               }
-
               rowObj[col] = cellValue;
             });
             rowObj.key = idx;
@@ -102,21 +66,43 @@ const CompareInfContent = () => {
     return false;
   };
 
-  // So sánh dữ liệu theo key riêng từng file
   const handleCompare = () => {
     if (!compareKey1 || !compareKey2) {
       message.warning("Vui lòng chọn cột để so sánh cho cả hai file!");
       return;
     }
-    // Lấy danh sách giá trị key của mỗi file
+
     const set2 = new Set(data2.map((row) => row[compareKey2]));
     const set1 = new Set(data1.map((row) => row[compareKey1]));
-    // Dòng ở file 1 không có ở file 2
+
     const diffData1 = data1.filter((row1) => !set2.has(row1[compareKey1]));
-    // Dòng ở file 2 không có ở file 1
     const diffData2 = data2.filter((row2) => !set1.has(row2[compareKey2]));
+
+    const both = data1.filter((row1) => set2.has(row1[compareKey1]));
+
     setDiff1(diffData1);
     setDiff2(diffData2);
+    setBothData(both);
+  };
+
+  const handleExportExcel = () => {
+    if (!diff1.length && !diff2.length && !bothData.length) {
+      message.warning("Chưa có dữ liệu để xuất!");
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    const sheet1 = XLSX.utils.json_to_sheet(diff1);
+    XLSX.utils.book_append_sheet(wb, sheet1, "Only in File 1");
+
+    const sheet2 = XLSX.utils.json_to_sheet(diff2);
+    XLSX.utils.book_append_sheet(wb, sheet2, "Only in File 2");
+
+    const sheet3 = XLSX.utils.json_to_sheet(bothData);
+    XLSX.utils.book_append_sheet(wb, sheet3, "In Both Files");
+
+    XLSX.writeFile(wb, "compare_result.xlsx");
   };
 
   return (
@@ -181,17 +167,27 @@ const CompareInfContent = () => {
           />
         </Col>
       </Row>
+
       <div style={{ margin: "24px 0" }}>
         <Button
           type="primary"
           onClick={handleCompare}
           disabled={!compareKey1 || !compareKey2}
+          style={{ marginRight: 8 }}
         >
           So sánh
         </Button>
+        <Button
+          type="default"
+          icon={<FileExcelOutlined />}
+          onClick={handleExportExcel}
+        >
+          Xuất Excel kết quả
+        </Button>
       </div>
+
       <Row gutter={16}>
-        <Col span={12}>
+        <Col span={8}>
           <h4>Dòng chỉ có ở File 1</h4>
           <Table
             columns={columns1}
@@ -202,11 +198,22 @@ const CompareInfContent = () => {
             pagination={{ pageSize: 5 }}
           />
         </Col>
-        <Col span={12}>
+        <Col span={8}>
           <h4>Dòng chỉ có ở File 2</h4>
           <Table
             columns={columns2}
             dataSource={diff2}
+            scroll={{ x: 900 }}
+            bordered
+            size="small"
+            pagination={{ pageSize: 5 }}
+          />
+        </Col>
+        <Col span={8}>
+          <h4>Dòng có ở cả hai file</h4>
+          <Table
+            columns={columns1}
+            dataSource={bothData}
             scroll={{ x: 900 }}
             bordered
             size="small"
