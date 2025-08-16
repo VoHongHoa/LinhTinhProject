@@ -38,9 +38,9 @@ const CompareInfContent = () => {
               let cellValue = row[colIdx];
 
               if (
-                col.toLowerCase() === "phone" &&
+                (col.toLowerCase() === "phone" || col.toLowerCase() === "tài khoản") &&
                 cellValue != null &&
-                cellValue.toString().length > 0
+                cellValue.toString().length === 9
               ) {
                 const phoneStr = cellValue.toString();
                 if (/^\d+$/.test(phoneStr) && phoneStr.length === 9) {
